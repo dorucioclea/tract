@@ -13,7 +13,7 @@ pub fn eval_order<
 ) -> TractResult<Vec<usize>> {
     let inputs = model.input_outlets()?.iter().map(|n| n.node).collect::<Vec<usize>>();
     let targets = model.output_outlets()?.iter().map(|n| n.node).collect::<Vec<usize>>();
-    eval_order_for_nodes(model.nodes(), &inputs, &targets)
+    eval_order_for_nodes(model.nodes(), &inputs, &targets, &[])
 }
 
 /// Find a working evaluation order for a list of nodes.
@@ -21,6 +21,7 @@ pub fn eval_order_for_nodes<F: Fact, O: Debug + Display + AsRef<dyn Op> + AsMut<
     nodes: &[BaseNode<F, O>],
     inputs: &[usize],
     targets: &[usize],
+    more_dependencies: &[(usize, usize)],
 ) -> TractResult<Vec<usize>> {
     let mut done = bit_set::BitSet::with_capacity(nodes.len());
     let mut order: Vec<usize> = vec![];
@@ -31,12 +32,24 @@ pub fn eval_order_for_nodes<F: Fact, O: Debug + Display + AsRef<dyn Op> + AsMut<
         let mut current_stack: Vec<(usize, usize)> = vec![(target, 0)];
         let mut pending = bit_set::BitSet::with_capacity(nodes.len());
         while let Some((current_node, current_input)) = current_stack.pop() {
-            if inputs.contains(&current_node) || current_input == nodes[current_node].inputs.len() {
+            let deps_from_inputs = nodes[current_node].inputs.len();
+            let all_deps_count =
+                deps_from_inputs + more_dependencies.iter().filter(|a| a.0 == current_node).count();
+            if inputs.contains(&current_node) || current_input == all_deps_count {
                 order.push(current_node);
                 done.insert(current_node);
                 pending.remove(current_node);
             } else {
-                let precursor = nodes[current_node].inputs[current_input].node;
+                let precursor = if current_input < deps_from_inputs {
+                    nodes[current_node].inputs[current_input].node
+                } else {
+                    more_dependencies
+                        .iter()
+                        .filter(|a| a.0 == current_node)
+                        .nth(current_input - deps_from_inputs)
+                        .unwrap()
+                        .1
+                };
                 if done.contains(precursor) {
                     current_stack.push((current_node, current_input + 1));
                 } else if pending.contains(precursor) {
