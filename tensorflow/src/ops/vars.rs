@@ -153,7 +153,11 @@ impl OpState for AssignState {
         } else {
             bail!("Assign has not been linked to var")
         };
-        *session.tensors.get_mut(var_id).unwrap() = new.clone().into_tensor();
+        let store = session.tensors.get_mut(var_id).unwrap();
+        if cfg!(debug_assertions) && (store.shape() != new.shape() && store.datum_type() != new.datum_type()) {
+            bail!("Invalid assignment to variable. Store is {:?}, assigned value is {:?}" , store, new);
+        }
+        *store = new.clone().into_tensor();
         Ok(tvec!(new))
     }
 }
@@ -178,6 +182,7 @@ impl InferenceRulesOp for Assign {
         check_input_arity(inputs, 2)?;
         check_output_arity(outputs, 1)?;
         s.equals(&inputs[0].datum_type, &inputs[1].datum_type)?;
+        s.equals(&inputs[0].shape, &inputs[1].shape)?;
         s.equals(&outputs[0].datum_type, &inputs[0].datum_type)?;
         s.equals(&inputs[1].shape, &inputs[0].shape)?;
         s.equals(&outputs[0].shape, &inputs[0].shape)?;
@@ -193,6 +198,9 @@ impl TypedOp for Assign {
     as_op!();
 
     fn output_facts(&self, inputs: &[&TypedFact]) -> TractResult<TVec<TypedFact>> {
+        if inputs[0].datum_type != inputs[1].datum_type || inputs[0].shape != inputs[1].shape {
+            bail!("Invalid assignement {:?}", inputs);
+        }
         Ok(tvec!(inputs[0].clone()))
     }
 }

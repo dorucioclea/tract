@@ -219,14 +219,13 @@ where
                         );
                     }
                     for (ix, (v, f)) in inputs.iter().zip(facts.iter()).enumerate() {
-                        if let Err(e) = f.matches(v) {
+                        if !f.matches(v)? {
                             bail!(
-                                "Evaluating {}: input {:?}, expected {:?}, got {:?} ({})",
+                                "Evaluating {}: input {:?}, expected {:?}, got {:?}",
                                 node,
                                 ix,
                                 f,
-                                v,
-                                e
+                                v
                             );
                         }
                     }
@@ -252,14 +251,13 @@ where
                         if node.outputs[ix].successors.len() == 0 {
                             continue;
                         }
-                        if let Err(e) = f.matches(v) {
+                        if !f.matches(v)? {
                             bail!(
-                                "Evaluating {}: output {:?}, expected {:?}, got {:?} ({})",
+                                "Evaluating {}: output {:?}, expected {:?}, got {:?}",
                                 node,
                                 ix,
                                 f,
-                                v,
-                                e
+                                v
                             );
                         }
                     }
